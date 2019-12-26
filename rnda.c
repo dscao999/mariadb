@@ -2,7 +2,7 @@
 #include <signal.h>
 #include <errno.h>
 #include "loglog.h"
-#include "ecc256/alsa_random.h"
+#include "alsarec.h"
 #include "mariadb.h"
 
 static volatile int stop_job = 0;
@@ -34,7 +34,7 @@ static int inst_handler(void)
 	return sysret;
 }
 
-static int trigger_one(unsigned int *rnum, struct alsa_param *alsa)
+static int trigger_one(unsigned int *rnum, const unsigned char *buf, int buflen)
 {
 	unsigned char dgst[32], *byte;
 	int idx, i, retv = 0;
@@ -44,8 +44,7 @@ static int trigger_one(unsigned int *rnum, struct alsa_param *alsa)
 	} rnd;
 
 	*rnum = 0;
-	if ((retv = alsa_random(alsa, (unsigned int *)dgst)) != 0)
-		logmsg(LOG_ERR, "Failed to get a good random number!\n");
+	alsa_random((unsigned int *)dgst, buf, buflen);
 	byte = dgst;
 	idx = byte[31] & 0x1f;
 	for (i = 0; i < 4; i++) {
@@ -63,10 +62,10 @@ int main(int argc, char *argv[])
 {
 	unsigned int rno, seq;
 	unsigned long rnum;
-	int cnt, retv = 0;
-	struct alsa_param *alsa;
+	int cnt, retv = 0, buflen;
 	struct mariadb *mdb;
 	MYSQL_BIND bids;
+	unsigned char *buf;
 
 	retv = inst_handler();
 	if (retv) {
@@ -74,8 +73,12 @@ int main(int argc, char *argv[])
 				strerror(retv));
 		return 1;
 	}
+
 	mdb = mariadb_init("dscao", NULL, "electoken");
-	check_pointer(mdb);
+	if (!mdb) {
+		logmsg(LOG_ERR, "Cannot Initialize DB\n");
+		return 1;
+	}
 	seq = mariadb_row_count(mdb, "rndnum");
 	printf("Total %d records in table: %s\n", seq, "rndnum");
 
@@ -85,12 +88,16 @@ int main(int argc, char *argv[])
 		goto exit_10;
 	}
 
-	alsa = alsa_init("hw:0,0", 0);
-	check_pointer(alsa);
+	alsa_init();
+	buflen = alsa_reclen(1);
+	buf = malloc(buflen);
+	if (!check_pointer(buf, nomem))
+		exit(100);
 
 	cnt = 0;
 	while (stop_job == 0) {
-		if (!trigger_one(&rno, alsa)) {
+		alsa_record(1, buf, buflen);
+		if (!trigger_one(&rno, buf, buflen)) {
 			rnum = rno;
 			if (mariadb_stmt_execute(mdb)) {
 				retv = 2;
@@ -100,7 +107,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	alsa_exit(alsa);
+	alsa_exit();
 	
 exit_10:
 	mariadb_exit(mdb);

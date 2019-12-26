@@ -1,7 +1,7 @@
 CFLAGS ?= -Wall -g
-CFLAGS += -I/usr/include/mariadb -fPIC
+CFLAGS += -I/usr/include/mariadb -I../include -fPIC
 LDFLAGS = -g
-LIBS = ./ecc256/alsa_random.o ./ecc256/sha256.o -lmariadb -lasound
+LIBS = ./ecc256/alsarec.o ./ecc256/sha256.o -lmariadb -lasound
 
 .PHONY: rnda release clean
 

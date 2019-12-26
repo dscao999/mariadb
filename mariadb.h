@@ -8,13 +8,13 @@
 
 static inline void logmsg_mysql(MYSQL *mysql)
 {
-	logmsg(LOG_ERR, "Error(%d) [%s] \"%s\"", mysql_errno(mysql),
+	logmsg(LOG_ERR, "Error(%d) [%s] \"%s\"\n", mysql_errno(mysql),
 			mysql_sqlstate(mysql), mysql_error(mysql));
 }
 
 static inline void logmsg_stmt(MYSQL_STMT *stmt)
 {
-	logmsg(LOG_ERR, "Error(%d) [%s] \"%s\"", mysql_stmt_errno(stmt),
+	logmsg(LOG_ERR, "Error(%d) [%s] \"%s\"\n", mysql_stmt_errno(stmt),
 			mysql_stmt_sqlstate(stmt), mysql_stmt_error(stmt));
 }
 
