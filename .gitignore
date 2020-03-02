@@ -54,3 +54,4 @@ dkms.conf
 core
 ecc256
 rnda
+elec_dbinit

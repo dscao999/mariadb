@@ -1,14 +1,19 @@
 CFLAGS ?= -Wall -g
 CFLAGS += -I/usr/include/mariadb -I../include -fPIC
 LDFLAGS = -g
-LIBS = ./ecc256/alsarec.o ./ecc256/sha256.o -lmariadb -lasound
+#LIBS = -lecc256 -lmariadb -lasound
 
-.PHONY: rnda release clean
+.PHONY: all release clean
+
+all: rnda elec_dbinit
 
 rnda: rnda.o mariadb.o
-	$(LINK.o) $^ $(LIBS) -o $@
+	$(LINK.o) $^ -L../lib -lecc256 -lmariadb -o $@
 
-release: rnda
+elec_dbinit: elec_dbinit.o
+	$(LINK.o) $^ -L../lib -lecc256 -lmariadb -o $@
+
+release: rnda elec_dbinit
 
 release: CFLAGS += -O2
 
@@ -16,3 +21,4 @@ release: LDFLAGS += -Wl,-O2
 
 clean:
 	rm -rf rnda *.o
+	rm -f rnda elec_dbinit
