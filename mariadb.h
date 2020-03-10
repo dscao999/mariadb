@@ -25,8 +25,8 @@ struct mariadb {
 	MYSQL_ROW row;
 };
 
-struct mariadb *mariadb_init(const char *user, const char *passwd,
-		const char *dbname);
+int mariadb_init(struct mariadb *mdb, const char *user,
+		const char *passwd);
 static inline void mariadb_exit(struct mariadb *db)
 {
 	if (db) {

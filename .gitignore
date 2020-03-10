@@ -51,6 +51,7 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+.*.swp
 core
 ecc256
 rnda

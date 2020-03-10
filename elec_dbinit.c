@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "virtmach.h"
 #include "base64.h"
+#include "tok_block.h"
 
 static const char *dbname = "electoken";
 
@@ -11,6 +12,7 @@ static int insert_vendors(MYSQL *mcon);
 static int insert_etoken_cat(MYSQL *mcon);
 static int insert_etoken_type(MYSQL *mcon);
 static int insert_sales(MYSQL *mcon);
+static int insert_first_block(MYSQL *mcon);
 
 struct table_desc {
 	const char *tbname;
@@ -21,14 +23,14 @@ static const struct table_desc tables[] = {
 	{
 		"vendors",
 		"(id smallint unsigned primary key, " \
-			"name char(16) not null, " \
+			"name char(16) not null unique, " \
 			"descp char(128) not null)",
 		insert_vendors
 	},
 	{
 		"etoken_cat",
 		"(id smallint unsigned primary key, " \
-			"name char(16) not null, " \
+			"name char(16) not null unique, " \
 			"descp char(128) not null, " \
 			"vendor_id smallint unsigned not null, " \
 			"constraint foreign key (vendor_id) references " \
@@ -38,7 +40,7 @@ static const struct table_desc tables[] = {
 	{
 		"etoken_type",
 		"(id smallint unsigned primary key, " \
-			"name char(16) not null, " \
+			"name char(16) not null unique, " \
 			"descp char(128) not null, " \
 			"cat_id smallint unsigned not null, " \
 			"constraint foreign key (cat_id) references " \
@@ -47,12 +49,40 @@ static const struct table_desc tables[] = {
 	},
 	{
 		"sales",
-		"(keyhash char(32) not null, " \
+		"(keyhash char(29) not null, " \
 			"etoken_id smallint unsigned not null, " \
 			"lockscript blob not null, "
 			"constraint foreign key (etoken_id) references " \
 			"etoken_type(id))",
 		insert_sales
+	},
+	{
+		"blockchain", \
+		"(blockid bigint unsigned primary key auto_increment, " \
+			"hdr_hash binary(32) not null unique, " \
+			"blockdata blob not null)",
+		insert_first_block
+	},
+	{
+		"tx_verified", \
+		"(tx_hash binary(32) not null, " \
+			"len int unsigned not null, " \
+			"tx_data blob not null)",
+		NULL
+	},
+	{
+		"utxo",
+		"(keyhash char(29) not null, " \
+			"etoken_id smallint unsigned not null, " \
+			"value bigint unsigned not null, " \
+			"vout_idx tinyint unsigned not null, " \
+			"blockid bigint unsigned not null, " \
+			"txid binary(32) not null, " \
+			"constraint foreign key (etoken_id) references " \
+			"etoken_type(id), " \
+			"constraint foreign key (blockid) references " \
+			"blockchain(blockid))",
+		NULL
 	},
 	{
 		NULL, NULL, NULL
@@ -184,7 +214,8 @@ int main(int argc, char *argv[])
 			continue;
 		}
 
-		tbset->insert_table(mcon);
+		if (tbset->insert_table)
+			tbset->insert_table(mcon);
 		tbset++;
 	}
 
@@ -484,26 +515,26 @@ exit_10:
 static const char *sales_insert = "INSERT INTO sales(keyhash, etoken_id, lockscript) " \
 	"VALUES(?, ?, ?)";
 static const struct sales sales_cap[] = {
-	{"lzTpF8LVPxLP5DebT2YJ/XWkZkk=", 40003, NULL},
-	{"lzTpF8LVPxLP5DebT2YJ/XWkZkk=", 40005, NULL},
-	{"lzTpF8LVPxLP5DebT2YJ/XWkZkk=", 40013, NULL},
-	{"lzTpF8LVPxLP5DebT2YJ/XWkZkk=", 40015, NULL},
-	{"lzTpF8LVPxLP5DebT2YJ/XWkZkk=", 40023, NULL},
-	{"lzTpF8LVPxLP5DebT2YJ/XWkZkk=", 40025, NULL},
-	{"+LW8Hpz4CDumrn1NKhcFaraQydM=", 40031, NULL},
-	{"+LW8Hpz4CDumrn1NKhcFaraQydM=", 40033, NULL},
-	{"i2p5hM3Geo3OzcapXlcE+6wFmlU=", 41005, NULL},
-	{"i2p5hM3Geo3OzcapXlcE+6wFmlU=", 41008, NULL},
-	{"i2p5hM3Geo3OzcapXlcE+6wFmlU=", 41011, NULL},
-	{"i2p5hM3Geo3OzcapXlcE+6wFmlU=", 41013, NULL},
-	{"i2p5hM3Geo3OzcapXlcE+6wFmlU=", 41021, NULL},
-	{"i2p5hM3Geo3OzcapXlcE+6wFmlU=", 41022, NULL},
-	{"NYKYO93uVwM3/FEjlRI2cGuY7Bc=", 42003, NULL},
-	{"NYKYO93uVwM3/FEjlRI2cGuY7Bc=", 42005, NULL},
-	{"NYKYO93uVwM3/FEjlRI2cGuY7Bc=", 42013, NULL},
-	{"NYKYO93uVwM3/FEjlRI2cGuY7Bc=", 42015, NULL},
-	{"NYKYO93uVwM3/FEjlRI2cGuY7Bc=", 42021, NULL},
-	{"NYKYO93uVwM3/FEjlRI2cGuY7Bc=", 42022, NULL},
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40003, NULL},
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40005, NULL},
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40013, NULL},
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40015, NULL},
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40023, NULL},
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40025, NULL},
+	{"1nHW46+6QyeDjdWoRTfsleFNmlg=", 40031, NULL},
+	{"1nHW46+6QyeDjdWoRTfsleFNmlg=", 40033, NULL},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41005, NULL},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41008, NULL},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41011, NULL},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41013, NULL},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41021, NULL},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41022, NULL},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42003, NULL},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42005, NULL},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42013, NULL},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42015, NULL},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42021, NULL},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42022, NULL},
 	{NULL, 0, NULL}
 };
 
@@ -536,7 +567,7 @@ static int insert_sales(MYSQL *mcon)
 	memset(mbind, 0, sizeof(mbind));
 	mbind[0].buffer_type = MYSQL_TYPE_STRING;
 	mbind[0].buffer = sale->pkhash;
-	mbind[0].buffer_length = 32;
+	mbind[0].buffer_length = 29;
 	mbind[0].length = &pkhash_len;
 
 	mbind[1].buffer_type = MYSQL_TYPE_SHORT;
@@ -567,7 +598,7 @@ static int insert_sales(MYSQL *mcon)
 
 		numb = str2bin_b64((unsigned char *)sale->lockscript+3, 20,
 				sale->pkhash);
-		assert(numb+1 == 20);
+		assert(numb == 20);
 		if (mysql_stmt_execute(mstmt)) {
 			fprintf(stderr, "mysql_stmt_execute failed: %s, %s\n",
 					sales_insert, mysql_stmt_error(mstmt));
@@ -576,8 +607,87 @@ static int insert_sales(MYSQL *mcon)
 		}
 	}
 
-	free(sale);
 exit_10:
+	free(sale);
+	mysql_stmt_close(mstmt);
+	return retv;
+}
+
+struct block_chain {
+	unsigned long blockid;
+	char *blkbuf;
+};
+
+static const char *block_insert_sql = "INSERT INTO blockchain(blockid, " \
+		       "hdr_hash, blockdata) VALUES(?, ?, ?)";
+
+static int insert_first_block(MYSQL *mcon)
+{
+	int retv = 0;
+	MYSQL_STMT *mstmt;
+	MYSQL_BIND mbind[3];
+	struct block_chain blkchain;
+	unsigned long hash_len, blk_len;
+	const struct bl_header *bhdr;
+	struct sha256 sha;
+
+	blkchain.blkbuf = malloc(512);
+	if (!blkchain.blkbuf) {
+		fprintf(stderr, "Out of Memory!\n");
+		exit(100);
+	}
+	tok_block_init(27);
+
+	mstmt = mysql_stmt_init(mcon);
+	if (!mstmt) {
+		fprintf(stderr, "mysql_stmt_init out of memory!\n");
+		exit(100);
+	}
+	if (mysql_stmt_prepare(mstmt, block_insert_sql,
+				strlen(block_insert_sql))) {
+		fprintf(stderr, "mysql_stmt_prepare failed %s\n", sales_insert);
+		fprintf(stderr, " %s\n", mysql_stmt_error(mstmt));
+		exit(12);
+	}
+
+	memset(mbind, 0, sizeof(mbind));
+	mbind[0].buffer_type = MYSQL_TYPE_LONG;
+	mbind[0].buffer = &blkchain.blockid;
+	mbind[0].is_unsigned = 1;
+
+	mbind[1].buffer_type = MYSQL_TYPE_BLOB;
+	mbind[1].buffer = sha.H;
+	mbind[1].buffer_length = 32;
+	mbind[1].length = &hash_len;
+
+	mbind[2].buffer_type = MYSQL_TYPE_BLOB;
+	mbind[2].buffer = blkchain.blkbuf;
+	mbind[2].buffer_length = 512;
+	mbind[2].length = &blk_len;
+
+	if (mysql_stmt_bind_param(mstmt, mbind)) {
+		fprintf(stderr, "mysql_stmt_bind_param failed: %s, %s\n",
+				sales_insert, mysql_stmt_error(mstmt));
+		retv = 5;
+		goto exit_10;
+	}
+
+	blkchain.blockid = 0;
+	blk_len = gensis_block(blkchain.blkbuf, 512);
+	bhdr = (const struct bl_header *)blkchain.blkbuf;
+	sha256_reset(&sha);
+	sha256(&sha, (const unsigned char *)bhdr, sizeof(struct bl_header));
+	hash_len = 32;
+
+	if (mysql_stmt_execute(mstmt)) {
+		fprintf(stderr, "mysql_stmt_execute failed: %s, %s\n",
+				sales_insert, mysql_stmt_error(mstmt));
+		retv = 6;
+		goto exit_10;
+	}
+
+exit_10:
+	free(blkchain.blkbuf);
 	mysql_stmt_close(mstmt);
 	return retv;
 }

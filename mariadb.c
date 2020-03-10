@@ -2,35 +2,34 @@
 #include <string.h>
 #include "mariadb.h"
 
-struct mariadb *mariadb_init(const char *user, const char *passwd,
-		const char *dbname)
-{
-	struct mariadb *mdb;
+const char dbname[] = "rndnum";
 
-	mdb = malloc(sizeof(struct mariadb));
-	if (!mdb)
-		return mdb;
+int mariadb_init(struct mariadb *mdb, const char *user,
+		const char *passwd)
+{
+	int retv = 0;
 
 	mdb->con = mysql_init(NULL);
 	if (mdb->con == NULL) {
 		logmsg_mysql(mdb->con);
-		goto err_10;
+		return 1;
 	}
 	if (mysql_real_connect(mdb->con, NULL, user, passwd, dbname,
 			0, NULL, 0) == NULL) {
 		logmsg_mysql(mdb->con);
+		retv = 1;
 		goto err_10;
 	}
 	mdb->stmt = mysql_stmt_init(mdb->con);
-	if (!mdb->stmt)
-		goto err_20;
-	return mdb;
+	if (!mdb->stmt) {
+		retv = 2;
+		goto err_10;
+	}
+	return retv;
 
-err_20:
-	mysql_close(mdb->con);
 err_10:
-	free(mdb);
-	return NULL;
+	mysql_close(mdb->con);
+	return 0;
 }
 
 int mariadb_stmt_prepare(struct mariadb *mdb, const char *query, int len,

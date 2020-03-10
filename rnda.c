@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 		goto exit_10;
 	}
 
-	alsa_init();
+	alsa_init(NULL);
 	buflen = alsa_reclen(1);
 	buf = malloc(buflen);
 	if (!check_pointer(buf, nomem))
