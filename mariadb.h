@@ -26,30 +26,10 @@ struct mariadb {
 };
 
 int mariadb_init(struct mariadb *mdb, const char *user,
-		const char *passwd);
+		const char *passwd, const char *host);
 static inline void mariadb_exit(struct mariadb *db)
 {
-	if (db) {
-		mysql_stmt_close(db->stmt);
+	if (db)
 		mysql_close(db->con);
-		free(db);
-	}
 }
-
-int mariadb_stmt_prepare(struct mariadb *mdb, const char *query, int len,
-		MYSQL_BIND *bds, ...);
-static inline void mariadb_stmt_close(struct mariadb *mdb)
-{
-	mysql_stmt_close(mdb->stmt);
-}
-static inline int mariadb_stmt_execute(struct mariadb *mdb)
-{
-	int retv;
-
-	if ((retv = mysql_stmt_execute(mdb->stmt)))
-		logmsg_stmt(mdb->stmt);
-	return retv;
-}
-
-unsigned long mariadb_row_count(struct mariadb *mdb, const char *table);
 #endif /* MARIADB_DSCAO__ */

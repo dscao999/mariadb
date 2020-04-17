@@ -64,13 +64,6 @@ static const struct table_desc tables[] = {
 		insert_first_block
 	},
 	{
-		"tx_verified", \
-		"(tx_hash binary(32) not null, " \
-			"len int unsigned not null, " \
-			"tx_data blob not null)",
-		NULL
-	},
-	{
 		"utxo",
 		"(keyhash char(29) not null, " \
 			"etoken_id smallint unsigned not null, " \
@@ -78,10 +71,18 @@ static const struct table_desc tables[] = {
 			"vout_idx tinyint unsigned not null, " \
 			"blockid bigint unsigned not null, " \
 			"txid binary(32) not null, " \
+			"in_process boolean default false " \
 			"constraint foreign key (etoken_id) references " \
 			"etoken_type(id), " \
 			"constraint foreign key (blockid) references " \
 			"blockchain(blockid))",
+		NULL
+	},
+	{
+		"txrec_pool",
+		"(txhash binary(32) not null unique, txdata blob not null, " \
+			"seq int unsigned auto_increment primary_key, " \
+			"in_process boolean default false)",
 		NULL
 	},
 	{
