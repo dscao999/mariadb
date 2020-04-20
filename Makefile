@@ -11,8 +11,11 @@ all: rnda elec_dbinit
 rnda: rnda.o mariadb.o
 	$(LINK.o) $^ -L../lib -lecc256 -lmariadb -o $@
 
-elec_dbinit: elec_dbinit.o tok_block.o
-	$(LINK.o) -pthread $^ -L../lib -lecc256 -lmariadb -o $@
+VPATH = ../ecc256
+eccobj = sha256.o base64.o ripemd160.o
+
+elec_dbinit: elec_dbinit.o tok_block.o $(eccobj)
+	$(LINK.o) -pthread $^ -lmariadb -o $@
 
 release: rnda elec_dbinit
 

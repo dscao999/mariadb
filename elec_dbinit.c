@@ -65,17 +65,16 @@ static const struct table_desc tables[] = {
 	},
 	{
 		"utxo",
-		"(keyhash char(29) not null, " \
+		"(keyhash binary(20) not null, " \
 			"etoken_id smallint unsigned not null, " \
 			"value bigint unsigned not null, " \
-			"vout_idx tinyint unsigned not null, " \
+			"vout_idx tinyint unsigned not null,  " \
 			"blockid bigint unsigned not null, " \
 			"txid binary(32) not null, " \
-			"in_process boolean default false " \
-			"constraint foreign key (etoken_id) references " \
-			"etoken_type(id), " \
-			"constraint foreign key (blockid) references " \
-			"blockchain(blockid))",
+			"in_process boolean default false, " \
+			"constraint foreign key(etoken_id) references " \
+			"etoken_type(id),  constraint foreign key(blockid) " \
+		       "references blockchain(blockid))",
 		NULL
 	},
 	{
