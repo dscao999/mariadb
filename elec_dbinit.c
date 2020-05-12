@@ -5,6 +5,7 @@
 #include "virtmach.h"
 #include "base64.h"
 #include "tok_block.h"
+#include "global_param.h"
 
 static const char *dbname = "electoken";
 
@@ -80,7 +81,7 @@ static const struct table_desc tables[] = {
 	{
 		"txrec_pool",
 		"(txhash binary(32) not null unique, txdata blob not null, " \
-			"seq int unsigned auto_increment primary_key, " \
+			"seq int unsigned auto_increment primary key, " \
 			"in_process boolean default false)",
 		NULL
 	},
@@ -125,6 +126,7 @@ int main(int argc, char *argv[])
 	struct table_desc table_set[sizeof(tables)/sizeof(struct table_desc)];
 	const struct table_desc *tbset;
 
+	global_param_init(NULL, 1, 0);
 	numtbs = sizeof(tables) / sizeof(struct table_desc);
 	for (i = 0; i < numtbs; i++)
 		table_set[i] = tables[i];
@@ -618,8 +620,8 @@ struct block_chain {
 	char *blkbuf;
 };
 
-static const char *block_insert_sql = "INSERT INTO blockchain(blockid, " \
-		       "hdr_hash, blockdata) VALUES(?, ?, ?)";
+static const char *block_insert_sql = "INSERT INTO blockchain(" \
+		       "hdr_hash, blockdata) VALUES(?, ?)";
 
 static int insert_first_block(MYSQL *mcon)
 {
@@ -629,14 +631,11 @@ static int insert_first_block(MYSQL *mcon)
 	struct block_chain blkchain;
 	unsigned long hash_len, blk_len;
 	const struct bl_header *bhdr;
-	struct sha256 sha;
+	unsigned char dgst[SHA_DGST_LEN];
 
 	blkchain.blkbuf = malloc(512);
-	if (!blkchain.blkbuf) {
-		fprintf(stderr, "Out of Memory!\n");
+	if (!check_pointer(blkchain.blkbuf))
 		exit(100);
-	}
-	tok_block_init(27);
 
 	mstmt = mysql_stmt_init(mcon);
 	if (!mstmt) {
@@ -651,19 +650,17 @@ static int insert_first_block(MYSQL *mcon)
 	}
 
 	memset(mbind, 0, sizeof(mbind));
-	mbind[0].buffer_type = MYSQL_TYPE_LONG;
-	mbind[0].buffer = &blkchain.blockid;
-	mbind[0].is_unsigned = 1;
+
+	hash_len = SHA_DGST_LEN;
+	mbind[0].buffer_type = MYSQL_TYPE_BLOB;
+	mbind[0].buffer = dgst;
+	mbind[0].buffer_length = SHA_DGST_LEN;
+	mbind[0].length = &hash_len;
 
 	mbind[1].buffer_type = MYSQL_TYPE_BLOB;
-	mbind[1].buffer = sha.H;
-	mbind[1].buffer_length = 32;
-	mbind[1].length = &hash_len;
-
-	mbind[2].buffer_type = MYSQL_TYPE_BLOB;
-	mbind[2].buffer = blkchain.blkbuf;
-	mbind[2].buffer_length = 512;
-	mbind[2].length = &blk_len;
+	mbind[1].buffer = blkchain.blkbuf;
+	mbind[1].buffer_length = 512;
+	mbind[1].length = &blk_len;
 
 	if (mysql_stmt_bind_param(mstmt, mbind)) {
 		fprintf(stderr, "mysql_stmt_bind_param failed: %s, %s\n",
@@ -672,12 +669,9 @@ static int insert_first_block(MYSQL *mcon)
 		goto exit_10;
 	}
 
-	blkchain.blockid = 0;
 	blk_len = gensis_block(blkchain.blkbuf, 512);
 	bhdr = (const struct bl_header *)blkchain.blkbuf;
-	sha256_reset(&sha);
-	sha256(&sha, (const unsigned char *)bhdr, sizeof(struct bl_header));
-	hash_len = 32;
+	sha256_dgst_2str(dgst, (const unsigned char *)bhdr, sizeof(struct bl_header));
 
 	if (mysql_stmt_execute(mstmt)) {
 		fprintf(stderr, "mysql_stmt_execute failed: %s, %s\n",
