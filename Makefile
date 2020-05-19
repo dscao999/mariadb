@@ -17,8 +17,8 @@ eccobj = sha256.o base64.o ripemd160.o alsarec.o ecc_secp256k1.o dscrc.o dsaes.o
 elec_dbinit: elec_dbinit.o global_param.o tok_block.o $(eccobj)
 	$(LINK.o) -pthread $^ -lmariadb -lasound -lgmp -o $@
 
-dbtx: dbtx.o
-	$(LINK.o) $^ -lmariadbclient -o $@
+dbtx: dbtx.o base64.o
+	$(LINK.o) $^ -lmariadb -o $@
 
 release: rnda elec_dbinit
 
