@@ -125,12 +125,21 @@ int main(int argc, char *argv[])
 	int retv = 0, i, numtbs;
 	struct table_desc table_set[sizeof(tables)/sizeof(struct table_desc)];
 	const struct table_desc *tbset;
+	struct sales *mesal;
 
 	global_param_init(NULL, 1, 0);
+	printf("My Mariadb client version: %s\n", mysql_get_client_info());
+	if (argc > 1) {
+		mesal = malloc(sizeof(struct sales));
+		if (!check_pointer(mesal))
+			return 10;
+
+		free(mesal);
+		return 0;
+	}
 	numtbs = sizeof(tables) / sizeof(struct table_desc);
 	for (i = 0; i < numtbs; i++)
 		table_set[i] = tables[i];
-	printf("My Mariadb client version: %s\n", mysql_get_client_info());
 	mcon = mysql_init(NULL);
 	if (!mcon) {
 		fprintf(stderr, "%s\n", mysql_error(mcon));
@@ -249,8 +258,8 @@ struct etoken_type {
 };
 struct sales {
 	char *pkhash;
-	unsigned short etoken_id;
 	char *lockscript;
+	unsigned short etoken_id;
 };
 
 static const char *ven_insert = "INSERT INTO vendors(id, name, descp) " \
@@ -517,32 +526,107 @@ exit_10:
 static const char *sales_insert = "INSERT INTO sales(keyhash, etoken_id, lockscript) " \
 	"VALUES(?, ?, ?)";
 static const struct sales sales_cap[] = {
-	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40003, NULL},
-	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40005, NULL},
-	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40013, NULL},
-	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40015, NULL},
-	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40023, NULL},
-	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", 40025, NULL},
-	{"1nHW46+6QyeDjdWoRTfsleFNmlg=", 40031, NULL},
-	{"1nHW46+6QyeDjdWoRTfsleFNmlg=", 40033, NULL},
-	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41005, NULL},
-	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41008, NULL},
-	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41011, NULL},
-	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41013, NULL},
-	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41021, NULL},
-	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", 41022, NULL},
-	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42003, NULL},
-	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42005, NULL},
-	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42013, NULL},
-	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42015, NULL},
-	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42021, NULL},
-	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", 42022, NULL},
-	{NULL, 0, NULL}
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", NULL, 40003},
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", NULL, 40005},
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", NULL, 40013},
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", NULL, 40015},
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", NULL, 40023},
+	{"utYeYEvZuR1UqgPTQFDMhbP5wi4=", NULL, 40025},
+	{"1nHW46+6QyeDjdWoRTfsleFNmlg=", NULL, 40031},
+	{"1nHW46+6QyeDjdWoRTfsleFNmlg=", NULL, 40033},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", NULL, 41005},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", NULL, 41008},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", NULL, 41011},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", NULL, 41013},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", NULL, 41021},
+	{"NBqOwGhPQMEzVhpGxG0mkNEDkxc=", NULL, 41022},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", NULL, 42003},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", NULL, 42005},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", NULL, 42013},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", NULL, 42015},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", NULL, 42021},
+	{"VV4JpIK1SfGrlfIaFbW9FBkUq5g=", NULL, 42022},
+	{NULL, NULL, 0}
 };
 
 static int insert_sales(MYSQL *mcon)
 {
 	int retv = 0, i, numb;
+	MYSQL_STMT *mstmt;
+	MYSQL_BIND mbind[3];
+	struct sales *sale;
+	unsigned long pkhash_len, script_len;
+
+	sale = malloc(sizeof(struct sales)+32+32);
+	if (!sale) {
+		fprintf(stderr, "Out of Memory!\n");
+		exit(100);
+	}
+	sale->pkhash = ((void *)sale) + sizeof(struct sales);
+	sale->lockscript = sale->pkhash + 32;
+	mstmt = mysql_stmt_init(mcon);
+	if (!mstmt) {
+		fprintf(stderr, "mysql_stmt_init out of memory!\n");
+		exit(100);
+	}
+	if (mysql_stmt_prepare(mstmt, sales_insert, strlen(sales_insert))) {
+		fprintf(stderr, "mysql_stmt_prepare failed %s\n", sales_insert);
+		fprintf(stderr, " %s\n", mysql_stmt_error(mstmt));
+		exit(12);
+	}
+
+	memset(mbind, 0, sizeof(mbind));
+	mbind[0].buffer_type = MYSQL_TYPE_STRING;
+	mbind[0].buffer = sale->pkhash;
+	mbind[0].buffer_length = 28;
+	mbind[0].length = &pkhash_len;
+
+	mbind[1].buffer_type = MYSQL_TYPE_SHORT;
+	mbind[1].buffer = &sale->etoken_id;
+	mbind[1].is_unsigned = 1;
+
+	mbind[2].buffer_type = MYSQL_TYPE_BLOB;
+	mbind[2].buffer = sale->lockscript;
+	mbind[2].buffer_length = 32;
+	mbind[2].length = &script_len;
+
+	if (mysql_stmt_bind_param(mstmt, mbind)) {
+		fprintf(stderr, "mysql_stmt_bind_param failed: %s, %s\n",
+				sales_insert, mysql_stmt_error(mstmt));
+		retv = 5;
+		goto exit_10;
+	}
+	pkhash_len = 28;
+	sale->lockscript[0] = OP_DUP;
+	sale->lockscript[1] = OP_RIPEMD160;
+	sale->lockscript[2] = 20;
+	sale->lockscript[23] = OP_EQUALVERIFY;
+	sale->lockscript[24] = OP_CHECKSIG;
+	script_len = 25;
+	for (i = 0; sales_cap[i].pkhash; i++) {
+		sale->etoken_id = sales_cap[i].etoken_id;
+		strcpy(sale->pkhash, sales_cap[i].pkhash);
+
+		numb = str2bin_b64((unsigned char *)sale->lockscript+3, 20,
+				sale->pkhash);
+		assert(numb == 20);
+		if (mysql_stmt_execute(mstmt)) {
+			fprintf(stderr, "mysql_stmt_execute failed: %s, %s\n",
+					sales_insert, mysql_stmt_error(mstmt));
+			retv = 6;
+			goto exit_10;
+		}
+	}
+
+exit_10:
+	free(sale);
+	mysql_stmt_close(mstmt);
+	return retv;
+}
+
+static int insert_one_sale(MYSQL *mcon, const struct sales *mesal)
+{
+	int retv = 0, numb;
 	MYSQL_STMT *mstmt;
 	MYSQL_BIND mbind[3];
 	struct sales *sale;
@@ -594,19 +678,16 @@ static int insert_sales(MYSQL *mcon)
 	sale->lockscript[23] = OP_EQUALVERIFY;
 	sale->lockscript[24] = OP_CHECKSIG;
 	script_len = 25;
-	for (i = 0; sales_cap[i].pkhash; i++) {
-		sale->etoken_id = sales_cap[i].etoken_id;
-		strcpy(sale->pkhash, sales_cap[i].pkhash);
 
-		numb = str2bin_b64((unsigned char *)sale->lockscript+3, 20,
-				sale->pkhash);
-		assert(numb == 20);
-		if (mysql_stmt_execute(mstmt)) {
-			fprintf(stderr, "mysql_stmt_execute failed: %s, %s\n",
-					sales_insert, mysql_stmt_error(mstmt));
-			retv = 6;
-			goto exit_10;
-		}
+	sale->etoken_id = mesal->etoken_id;
+	strcpy(sale->pkhash, mesal->pkhash);
+	numb = str2bin_b64((unsigned char *)sale->lockscript+3, 20,
+			mesal->pkhash);
+	assert(numb == 20);
+	if (mysql_stmt_execute(mstmt)) {
+		fprintf(stderr, "mysql_stmt_execute failed: %s, %s\n",
+				sales_insert, mysql_stmt_error(mstmt));
+		retv = 6;
 	}
 
 exit_10:
