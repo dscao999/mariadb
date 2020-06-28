@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
 	rsbnd[0].buffer = ripe;
 	rsbnd[0].buffer_length = sizeof(ripe);
 	rsbnd[0].length = &hash_len;
-	rsbnd[1].buffer_type = MYSQL_TYPE_SHORT;
+	rsbnd[1].buffer_type = MYSQL_TYPE_LONG;
 	rsbnd[1].buffer = &etoken_id;
 	rsbnd[1].is_unsigned = 1;
 	rsbnd[2].buffer_type = MYSQL_TYPE_LONGLONG;

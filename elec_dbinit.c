@@ -23,27 +23,27 @@ struct table_desc {
 static const struct table_desc tables[] = {
 	{
 		"vendors",
-		"(id smallint unsigned primary key, " \
+		"(id int unsigned primary key, " \
 			"name char(16) not null unique, " \
 			"descp char(128) not null)",
 		insert_vendors
 	},
 	{
 		"etoken_cat",
-		"(id smallint unsigned primary key, " \
+		"(id int unsigned primary key, " \
 			"name char(16) not null unique, " \
 			"descp char(128) not null, " \
-			"vendor_id smallint unsigned not null, " \
+			"vendor_id int unsigned not null, " \
 			"constraint foreign key (vendor_id) references " \
 			"vendors(id))",
 		insert_etoken_cat
 	},
 	{
 		"etoken_type",
-		"(id smallint unsigned primary key, " \
+		"(id int unsigned primary key, " \
 			"name char(16) not null unique, " \
 			"descp char(128) not null, " \
-			"cat_id smallint unsigned not null, " \
+			"cat_id int unsigned not null, " \
 			"constraint foreign key (cat_id) references " \
 			"etoken_cat(id))",
 		insert_etoken_type
@@ -51,7 +51,7 @@ static const struct table_desc tables[] = {
 	{
 		"sales",
 		"(keyhash char(29) not null, " \
-			"etoken_id smallint unsigned not null, " \
+			"etoken_id int unsigned not null, " \
 			"lockscript blob not null, "
 			"constraint foreign key (etoken_id) references " \
 			"etoken_type(id))",
@@ -67,10 +67,10 @@ static const struct table_desc tables[] = {
 	{
 		"utxo",
 		"(keyhash binary(20) not null, " \
-			"etoken_id smallint unsigned not null, " \
+			"etoken_id int unsigned not null, " \
 			"value bigint unsigned not null, " \
 			"vout_idx tinyint unsigned not null,  " \
-			"blockid bigint unsigned not null, " \
+			"blockid bigint unsigned default(1), " \
 			"txid binary(32) not null, " \
 			"in_process boolean default false, " \
 			"constraint foreign key(etoken_id) references " \
@@ -116,6 +116,31 @@ exit_10:
 }
 
 
+struct vendors {
+	unsigned int id;
+	char *name;
+	char *desc;
+};
+struct etoken_cat {
+	unsigned int id;
+	char *name;
+	char *desc;
+	unsigned int vendor_id;
+};
+struct etoken_type {
+	unsigned int id;
+	char *name;
+	char *desc;
+	unsigned int cat_id;
+};
+struct sales {
+	char *pkhash;
+	char *lockscript;
+	unsigned int etoken_id;
+};
+
+static int insert_one_sale(MYSQL *mcon, const struct sales *mesal);
+
 int main(int argc, char *argv[])
 {
 	MYSQL *mcon;
@@ -127,19 +152,8 @@ int main(int argc, char *argv[])
 	const struct table_desc *tbset;
 	struct sales *mesal;
 
-	global_param_init(NULL, 1, 0);
+	global_param_init(NULL);
 	printf("My Mariadb client version: %s\n", mysql_get_client_info());
-	if (argc > 1) {
-		mesal = malloc(sizeof(struct sales));
-		if (!check_pointer(mesal))
-			return 10;
-
-		free(mesal);
-		return 0;
-	}
-	numtbs = sizeof(tables) / sizeof(struct table_desc);
-	for (i = 0; i < numtbs; i++)
-		table_set[i] = tables[i];
 	mcon = mysql_init(NULL);
 	if (!mcon) {
 		fprintf(stderr, "%s\n", mysql_error(mcon));
@@ -149,6 +163,22 @@ int main(int argc, char *argv[])
 		retv = 2;
 		goto err_exit_10;
 	}
+	if (argc > 1) {
+		mesal = malloc(sizeof(struct sales));
+		if (!check_pointer(mesal))
+			return 10;
+		mesal->pkhash = argv[1];
+		mesal->etoken_id = atoi(argv[2]);
+		printf("Will create a sale record in sales table.\n");
+		if (insert_one_sale(mcon, mesal))
+			fprintf(stderr, "Failed to insert a sale record.\n");
+		free(mesal);
+		return 0;
+	}
+
+	numtbs = sizeof(tables) / sizeof(struct table_desc);
+	for (i = 0; i < numtbs; i++)
+		table_set[i] = tables[i];
 	if (mysql_query(mcon, "show databases")) {
 		retv = 3;
 		goto err_exit_10;
@@ -239,29 +269,6 @@ err_exit_10:
 	return retv;
 }
 
-struct vendors {
-	unsigned short id;
-	char *name;
-	char *desc;
-};
-struct etoken_cat {
-	unsigned short id;
-	char *name;
-	char *desc;
-	unsigned short vendor_id;
-};
-struct etoken_type {
-	unsigned short id;
-	char *name;
-	char *desc;
-	unsigned short cat_id;
-};
-struct sales {
-	char *pkhash;
-	char *lockscript;
-	unsigned short etoken_id;
-};
-
 static const char *ven_insert = "INSERT INTO vendors(id, name, descp) " \
 	"VALUES(?, ?, ?)";
 static const struct vendors vens[] = {
@@ -298,7 +305,7 @@ static int insert_vendors(MYSQL *mcon)
 	ven->desc = ven->name + 32;
 	memset(mbind, 0, sizeof(mbind));
 
-	mbind[0].buffer_type = MYSQL_TYPE_SHORT;
+	mbind[0].buffer_type = MYSQL_TYPE_LONG;
 	mbind[0].buffer = &ven->id;
 	mbind[0].is_unsigned = 1;
 
@@ -380,7 +387,7 @@ static int insert_etoken_cat(MYSQL *mcon)
 	}
 
 	memset(mbind, 0, sizeof(mbind));
-	mbind[0].buffer_type = MYSQL_TYPE_SHORT;
+	mbind[0].buffer_type = MYSQL_TYPE_LONG;
 	mbind[0].buffer = &cat->id;
 	mbind[0].is_unsigned = 1;
 
@@ -394,7 +401,7 @@ static int insert_etoken_cat(MYSQL *mcon)
 	mbind[2].buffer_length = 128;
 	mbind[2].length = &desc_len;
 
-	mbind[3].buffer_type = MYSQL_TYPE_SHORT;
+	mbind[3].buffer_type = MYSQL_TYPE_LONG;
 	mbind[3].buffer = &cat->vendor_id;
 	mbind[3].is_unsigned = 1;
 
@@ -478,7 +485,7 @@ static int insert_etoken_type(MYSQL *mcon)
 	}
 
 	memset(mbind, 0, sizeof(mbind));
-	mbind[0].buffer_type = MYSQL_TYPE_SHORT;
+	mbind[0].buffer_type = MYSQL_TYPE_LONG;
 	mbind[0].buffer = &etype->id;
 	mbind[0].is_unsigned = 1;
 
@@ -492,7 +499,7 @@ static int insert_etoken_type(MYSQL *mcon)
 	mbind[2].buffer_length = 128;
 	mbind[2].length = &desc_len;
 
-	mbind[3].buffer_type = MYSQL_TYPE_SHORT;
+	mbind[3].buffer_type = MYSQL_TYPE_LONG;
 	mbind[3].buffer = &etype->cat_id;
 	mbind[3].is_unsigned = 1;
 
@@ -581,7 +588,7 @@ static int insert_sales(MYSQL *mcon)
 	mbind[0].buffer_length = 28;
 	mbind[0].length = &pkhash_len;
 
-	mbind[1].buffer_type = MYSQL_TYPE_SHORT;
+	mbind[1].buffer_type = MYSQL_TYPE_LONG;
 	mbind[1].buffer = &sale->etoken_id;
 	mbind[1].is_unsigned = 1;
 
@@ -626,17 +633,88 @@ exit_10:
 
 static int insert_one_sale(MYSQL *mcon, const struct sales *mesal)
 {
-	int retv = 0, numb;
+	int retv = 0, numb, len;
 	MYSQL_STMT *mstmt;
 	MYSQL_BIND mbind[3];
 	struct sales *sale;
+	char *etoken_sql, buf[RIPEMD_LEN];
 	unsigned long pkhash_len, script_len;
+	MYSQL_RES *mres;
+	MYSQL_ROW mrow;
 
-	sale = malloc(sizeof(struct sales)+32+32);
+	if (strlen(mesal->pkhash) != 28) {
+		fprintf(stderr, "Invalid sales ID: %s\n", mesal->pkhash);
+		return 102;
+	}
+	len = str2bin_b64((unsigned char *)buf, RIPEMD_LEN, mesal->pkhash);
+	if (len != RIPEMD_LEN) {
+		fprintf(stderr, "Invalid sales ID: %s\n", mesal->pkhash);
+		return 102;
+	}
+
+	if (mysql_query(mcon, "use electoken") != 0) {
+		fprintf(stderr, "No Database electoken: %s\n", mysql_error(mcon));
+		return 103;
+	}
+	sale = malloc(sizeof(struct sales)+32+128);
 	if (!sale) {
 		fprintf(stderr, "Out of Memory!\n");
-		exit(100);
+		return -ENOMEM;
 	}
+	etoken_sql = (char *)sale;
+	strcpy(etoken_sql, "select name from etoken_type where id = ");
+	len = strlen(etoken_sql);
+	sprintf(etoken_sql+len, "%d", mesal->etoken_id);
+	if (mysql_query(mcon, etoken_sql) != 0) {
+		fprintf(stderr, "Cannot execute \"%s\": %s\n", etoken_sql,
+				mysql_error(mcon));
+		retv = mysql_errno(mcon);
+		goto exit_5;
+	}
+	mres = mysql_store_result(mcon);
+	if (!mres) {
+		fprintf(stderr, "EToken ID: %d not found: %s.\n",
+				mesal->etoken_id, mysql_error(mcon));
+		retv = mysql_errno(mcon);
+		mysql_free_result(mres);
+		goto exit_5;
+	}
+	mrow = mysql_fetch_row(mres);
+	if (!mrow) {
+		fprintf(stderr, "Etoken ID: %d not exist.\n", mesal->etoken_id);
+		retv = 101;
+		mysql_free_result(mres);
+		goto exit_5;
+	}
+	mysql_free_result(mres);
+	
+	strcpy(etoken_sql, "select lockscript from sales where etoken_id = ");
+	len = strlen(etoken_sql);
+	sprintf(etoken_sql+len, "%d and keyhash = \"%s\"", mesal->etoken_id,
+			mesal->pkhash);
+	if(mysql_query(mcon, etoken_sql)) {
+		fprintf(stderr, "Cannot execute \"%s\": %s\n", etoken_sql,
+				mysql_error(mcon));
+		retv = mysql_errno(mcon);
+		goto exit_5;
+	}
+	mres = mysql_store_result(mcon);
+	if (!mres) {
+		fprintf(stderr, "SQL error: %s\n", mysql_error(mcon));
+		retv = mysql_errno(mcon);
+		mysql_free_result(mres);
+		goto exit_5;
+	}
+	mrow = mysql_fetch_row(mres);
+	if (mrow) {
+		fprintf(stderr, "Duplicate sales ID: %s, EToken: %d\n",
+				mesal->pkhash, mesal->etoken_id);
+		retv = 104;
+		mysql_free_result(mres);
+		goto exit_5;
+	}
+	mysql_free_result(mres);
+
 	sale->pkhash = ((void *)sale) + sizeof(struct sales);
 	sale->lockscript = sale->pkhash + 32;
 	mstmt = mysql_stmt_init(mcon);
@@ -653,10 +731,10 @@ static int insert_one_sale(MYSQL *mcon, const struct sales *mesal)
 	memset(mbind, 0, sizeof(mbind));
 	mbind[0].buffer_type = MYSQL_TYPE_STRING;
 	mbind[0].buffer = sale->pkhash;
-	mbind[0].buffer_length = 29;
+	mbind[0].buffer_length = 32;
 	mbind[0].length = &pkhash_len;
 
-	mbind[1].buffer_type = MYSQL_TYPE_SHORT;
+	mbind[1].buffer_type = MYSQL_TYPE_LONG;
 	mbind[1].buffer = &sale->etoken_id;
 	mbind[1].is_unsigned = 1;
 
@@ -671,7 +749,6 @@ static int insert_one_sale(MYSQL *mcon, const struct sales *mesal)
 		retv = 5;
 		goto exit_10;
 	}
-	pkhash_len = 28;
 	sale->lockscript[0] = OP_DUP;
 	sale->lockscript[1] = OP_RIPEMD160;
 	sale->lockscript[2] = 20;
@@ -681,7 +758,9 @@ static int insert_one_sale(MYSQL *mcon, const struct sales *mesal)
 
 	sale->etoken_id = mesal->etoken_id;
 	strcpy(sale->pkhash, mesal->pkhash);
-	numb = str2bin_b64((unsigned char *)sale->lockscript+3, 20,
+	pkhash_len = strlen(sale->pkhash);
+	script_len = RIPEMD_LEN;
+	numb = str2bin_b64((unsigned char *)sale->lockscript+3, RIPEMD_LEN,
 			mesal->pkhash);
 	assert(numb == 20);
 	if (mysql_stmt_execute(mstmt)) {
@@ -691,8 +770,9 @@ static int insert_one_sale(MYSQL *mcon, const struct sales *mesal)
 	}
 
 exit_10:
-	free(sale);
 	mysql_stmt_close(mstmt);
+exit_5:
+	free(sale);
 	return retv;
 }
 

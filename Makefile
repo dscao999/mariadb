@@ -12,9 +12,9 @@ rnda: rnda.o mariadb.o
 	$(LINK.o) $^ -L../lib -lecc256 -lmariadb -o $@
 
 VPATH = ../ecc256:../elec_token
-eccobj = sha256.o base64.o ripemd160.o alsarec.o ecc_secp256k1.o dscrc.o dsaes.o
+eccobj = sha256.o base64.o ripemd160.o rand32bytes.o ecc_secp256k1.o dscrc.o dsaes.o
 
-elec_dbinit: elec_dbinit.o global_param.o tok_block.o $(eccobj)
+elec_dbinit: elec_dbinit.o global_param.o toktx.o toktx_svr.o tok_block.o virtmach.o tokens.o $(eccobj)
 	$(LINK.o) -pthread $^ -lmariadb -lasound -lgmp -o $@
 
 dbtx: dbtx.o base64.o
