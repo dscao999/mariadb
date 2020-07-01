@@ -7,8 +7,7 @@
 #include "loglog.h"
 #include "base64.h"
 
-static const char *selsql = "SELECT keyhash, etoken_id, value FROM utxo " \
-			     "WHERE in_process = false AND blockid > 1";
+static const char *insert_sql = "INSERT INTO txt_unique values (?, ?)";
 
 static volatile int gexit = 0;
 
@@ -23,11 +22,10 @@ int main(int argc, char *argv[])
 	MYSQL *mcon;
 	MYSQL_STMT *smt;
 	MYSQL_BIND rsbnd[3];
-	unsigned int etoken_id;
-	unsigned long value;
-	unsigned char ripe[24], ripe_str[32];
-	unsigned long hash_len;
-	int retv = 0, mysql_retv, len;
+	unsigned int seq_id;
+	char animal[16];
+	unsigned long slen;
+	int retv = 0;
 	struct sigaction mact;
 
 	memset(&mact, 0, sizeof(mact));
@@ -41,49 +39,37 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	smt = mysql_stmt_init(mcon);
-	if (mysql_stmt_prepare(smt, selsql, strlen(selsql))) {
+	if (mysql_stmt_prepare(smt, insert_sql, strlen(insert_sql))) {
 		logmsg(LOG_ERR, "Statement Preparation failed: %s, %s\n",
-				selsql, mysql_stmt_error(smt));
+				insert_sql, mysql_stmt_error(smt));
 		mysql_close(mcon);
 		return 2;
 	}
 	memset(rsbnd, 0, sizeof(rsbnd));
-	rsbnd[0].buffer_type = MYSQL_TYPE_BLOB;
-	rsbnd[0].buffer = ripe;
-	rsbnd[0].buffer_length = sizeof(ripe);
-	rsbnd[0].length = &hash_len;
-	rsbnd[1].buffer_type = MYSQL_TYPE_LONG;
-	rsbnd[1].buffer = &etoken_id;
-	rsbnd[1].is_unsigned = 1;
-	rsbnd[2].buffer_type = MYSQL_TYPE_LONGLONG;
-	rsbnd[2].buffer = &value;
-	rsbnd[2].is_unsigned = 1;
-	if (mysql_stmt_bind_result(smt, rsbnd)) {
+	rsbnd[0].buffer_type = MYSQL_TYPE_LONG;
+	rsbnd[0].buffer = &seq_id;
+	rsbnd[0].is_unsigned = 1;
+	rsbnd[1].buffer_type = MYSQL_TYPE_STRING;
+	rsbnd[1].buffer = &animal;
+	rsbnd[1].buffer_length = sizeof(animal);
+	rsbnd[1].length = &slen;
+	if (mysql_stmt_bind_param(smt, rsbnd)) {
 		logmsg(LOG_ERR, "Cannot bind result for: %s, %s\n",
-				selsql, mysql_stmt_error(smt));
+				insert_sql, mysql_stmt_error(smt));
 		mysql_stmt_close(smt);
 		mysql_close(mcon);
 		return 4;
 	}
 
+	strcpy(animal, "lion");
+	seq_id = 2;
+	slen = strlen(animal);
 	if (mysql_stmt_execute(smt)) {
-		logmsg(LOG_ERR, "Cannot execute statement %s, %s\n",
-				selsql, mysql_stmt_error(smt));
+		logmsg(LOG_ERR, "Cannot execute statement %s, %s, no: %d\n",
+				insert_sql, mysql_stmt_error(smt), mysql_stmt_errno(smt));
 		retv = 5;
 		goto exit_10;
 	}
-	mysql_stmt_store_result(smt);
-	do {
-		mysql_retv = mysql_stmt_fetch(smt);
-		if (mysql_retv != 0)
-			break;
-		len = bin2str_b64((char *)ripe_str, sizeof(ripe_str), ripe, hash_len);
-		ripe_str[len] = 0;
-		printf("Key: %s, token ID: %hu, Value: %lu\n", ripe_str,
-				etoken_id, value);
-
-	} while (1);
-	mysql_stmt_free_result(smt);
 
 exit_10:
 	printf("Exit Flag: %d\n", gexit);

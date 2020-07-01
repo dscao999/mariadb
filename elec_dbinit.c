@@ -70,7 +70,7 @@ static const struct table_desc tables[] = {
 			"etoken_id int unsigned not null, " \
 			"value bigint unsigned not null, " \
 			"vout_idx tinyint unsigned not null,  " \
-			"blockid bigint unsigned default(1), " \
+			"blockid bigint unsigned default 1, " \
 			"txid binary(32) not null, " \
 			"in_process boolean default false, " \
 			"constraint foreign key(etoken_id) references " \
