@@ -146,30 +146,57 @@ int main(int argc, char *argv[])
 	MYSQL *mcon;
 	MYSQL_RES *result;
 	MYSQL_ROW row;
-	int dbfound, skip;
+	int dbfound, skip, fin, c;
 	int retv = 0, i, numtbs;
 	struct table_desc table_set[sizeof(tables)/sizeof(struct table_desc)];
 	const struct table_desc *tbset;
 	struct sales *mesal;
+	const char *cnfname;
+	extern char *optarg;
+	extern int optind, opterr, optopt;
 
-	global_param_init(NULL);
+	
+	opterr = 0;
+	fin = 0;
+	do {
+		c = getopt(argc, argv, ":c:");
+		switch(c) {
+		case '?':
+			fprintf(stderr, "Unknown option: %c\n", optopt);
+			break;
+		case ':':
+			fprintf(stderr, "Mission option argument of: %c\n",
+					optopt);
+			break;
+		case -1:
+			fin = 1;
+			break;
+		case 'c':
+			cnfname = optarg;
+			break;
+		default:
+			assert(0);
+		}
+	} while (fin != 1);
+
+	global_param_init(cnfname);
 	printf("My Mariadb client version: %s\n", mysql_get_client_info());
 	mcon = mysql_init(NULL);
 	if (!mcon) {
 		fprintf(stderr, "%s\n", mysql_error(mcon));
 		return 1;
 	}
-	if (mysql_real_connect(mcon, "localhost", "dscao", NULL, NULL, 0, NULL, 0) == NULL) {
+	if (mysql_real_connect(mcon, g_param->db.host, g_param->db.user, NULL,
+			NULL, 0, NULL, 0) == NULL) {
 		retv = 2;
 		goto err_exit_10;
 	}
-	if (argc > 1) {
+	if (argc > optind + 1) {
 		mesal = malloc(sizeof(struct sales));
 		if (!check_pointer(mesal))
 			return 10;
-		mesal->pkhash = argv[1];
-		mesal->etoken_id = atoi(argv[2]);
-		printf("Will create a sale record in sales table.\n");
+		mesal->pkhash = argv[optind];
+		mesal->etoken_id = atoi(argv[optind+1]);
 		if (insert_one_sale(mcon, mesal))
 			fprintf(stderr, "Failed to insert a sale record.\n");
 		free(mesal);
@@ -652,7 +679,7 @@ static int insert_one_sale(MYSQL *mcon, const struct sales *mesal)
 		return 102;
 	}
 
-	if (mysql_query(mcon, "use electoken") != 0) {
+	if (mysql_query(mcon, "USE electoken") != 0) {
 		fprintf(stderr, "No Database electoken: %s\n", mysql_error(mcon));
 		return 103;
 	}
@@ -662,7 +689,7 @@ static int insert_one_sale(MYSQL *mcon, const struct sales *mesal)
 		return -ENOMEM;
 	}
 	etoken_sql = (char *)sale;
-	strcpy(etoken_sql, "select name from etoken_type where id = ");
+	strcpy(etoken_sql, "SELECT name FROM etoken_type WHERE id = ");
 	len = strlen(etoken_sql);
 	sprintf(etoken_sql+len, "%d", mesal->etoken_id);
 	if (mysql_query(mcon, etoken_sql) != 0) {
@@ -688,9 +715,9 @@ static int insert_one_sale(MYSQL *mcon, const struct sales *mesal)
 	}
 	mysql_free_result(mres);
 	
-	strcpy(etoken_sql, "select lockscript from sales where etoken_id = ");
+	strcpy(etoken_sql, "SELECT lockscript FROM sales WHERE etoken_id = ");
 	len = strlen(etoken_sql);
-	sprintf(etoken_sql+len, "%d and keyhash = \"%s\"", mesal->etoken_id,
+	sprintf(etoken_sql+len, "%d AND keyhash = \"%s\"", mesal->etoken_id,
 			mesal->pkhash);
 	if(mysql_query(mcon, etoken_sql)) {
 		fprintf(stderr, "Cannot execute \"%s\": %s\n", etoken_sql,
@@ -759,7 +786,6 @@ static int insert_one_sale(MYSQL *mcon, const struct sales *mesal)
 	sale->etoken_id = mesal->etoken_id;
 	strcpy(sale->pkhash, mesal->pkhash);
 	pkhash_len = strlen(sale->pkhash);
-	script_len = RIPEMD_LEN;
 	numb = str2bin_b64((unsigned char *)sale->lockscript+3, RIPEMD_LEN,
 			mesal->pkhash);
 	assert(numb == 20);
